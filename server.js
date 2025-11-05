@@ -45,12 +45,15 @@ app.post('/api/create-pix', async (req, res) => {
 		// Obter IP do cliente (se disponível)
 		const clientIp = req.headers['x-forwarded-for'] || req.connection.remoteAddress || req.ip || '127.0.0.1';
 
+		// URL do webhook (usar callback_url se fornecido, senão usar URL do servidor)
+		const webhookUrl = callback_url || (process.env.WEBHOOK_BASE_URL ? `${process.env.WEBHOOK_BASE_URL}/api/webhook/connectpay` : undefined);
+
 		// Preparar dados para ConnectPay
 		const connectPayBody = {
 			external_id: externalId,
 			total_amount: parseFloat(amount),
 			payment_method: 'PIX',
-			webhook_url: callback_url || undefined,
+			webhook_url: webhookUrl,
 			ip: clientIp,
 			items: [
 				{
@@ -177,6 +180,88 @@ app.post('/api/create-pix', async (req, res) => {
 			message: 'Erro interno do servidor',
 			error: error.message 
 		});
+	}
+});
+
+// Endpoint para receber webhook da ConnectPay
+app.post('/api/webhook/connectpay', async (req, res) => {
+	try {
+		const { id, external_id, status, total_amount, payment_method } = req.body;
+
+		console.log('Webhook ConnectPay recebido:', { id, external_id, status, total_amount });
+
+		// Responder imediatamente para evitar timeout
+		res.status(200).json({ received: true });
+
+		// Processar apenas se o pagamento foi autorizado
+		if (status === 'AUTHORIZED' && total_amount) {
+			// Enviar eventos TikTok via Server-Side API (mais confiável)
+			if (TIKTOK_API_TOKEN) {
+				try {
+					const tiktokEventData = {
+						event: 'CompletePayment',
+						event_id: external_id || id,
+						timestamp: new Date().toISOString(),
+						properties: {
+							contents: [{
+								content_id: 'parafusadeira-48v-001',
+								content_type: 'product',
+								content_name: 'Parafusadeira Furadeira 48V 2 Baterias com Maleta e Acessórios',
+								price: total_amount,
+								quantity: 1
+							}],
+							value: total_amount,
+							currency: 'BRL',
+							order_id: external_id || id
+						}
+					};
+
+					// Enviar para TikTok Events API (Server-Side)
+					await fetch('https://business-api.tiktok.com/open_api/v1.3/event/track/', {
+						method: 'POST',
+						headers: {
+							'Access-Token': TIKTOK_API_TOKEN,
+							'Content-Type': 'application/json'
+						},
+						body: JSON.stringify({
+							pixel_code: 'D453TI3C77U2P8MCGT20', // TikTok Pixel ID
+							event: 'CompletePayment',
+							event_id: external_id || id,
+							timestamp: new Date().toISOString(),
+							properties: tiktokEventData.properties
+						})
+					});
+				} catch (tiktokError) {
+					console.error('Erro ao enviar evento TikTok:', tiktokError);
+				}
+			}
+
+			// Atualizar Google Sheets com status de pagamento confirmado
+			if (process.env.GOOGLE_SHEETS_WEBHOOK && process.env.GOOGLE_SHEETS_WEBHOOK !== 'https://script.google.com/macros/s/SEU_ID_AQUI/exec') {
+				try {
+					await fetch(process.env.GOOGLE_SHEETS_WEBHOOK, {
+						method: 'POST',
+						headers: { 'Content-Type': 'application/json' },
+						body: JSON.stringify({
+							timestamp: new Date().toISOString(),
+							type: 'pix_payment_confirmed',
+							order_id: external_id || id,
+							transaction_id: id,
+							amount: total_amount,
+							status: 'AUTHORIZED',
+							payment_method: payment_method || 'PIX'
+						})
+					});
+				} catch (error) {
+					console.error('Erro ao atualizar Google Sheets:', error);
+				}
+			}
+		}
+
+	} catch (error) {
+		console.error('Erro ao processar webhook ConnectPay:', error);
+		// Sempre retornar 200 para evitar retentativas infinitas
+		res.status(200).json({ received: true, error: error.message });
 	}
 });
 

@@ -48,7 +48,24 @@ npm start
 ## ✅ Endpoints
 
 - `POST /api/create-pix` - Criar pedido Pix
+- `POST /api/webhook/connectpay` - Webhook para receber confirmações de pagamento da ConnectPay
 - `GET /api/health` - Status do servidor
+
+## 🔔 Configuração do Webhook
+
+Para que os eventos TikTok sejam disparados corretamente apenas quando o pagamento for confirmado:
+
+1. **Configure o webhook no painel da ConnectPay:**
+   - Acesse o painel da ConnectPay
+   - Vá em "Configurações" → "Webhooks"
+   - Adicione a URL: `https://seu-servidor-render.com/api/webhook/connectpay`
+   - Ou configure a variável `WEBHOOK_BASE_URL` no Render com a URL base do seu servidor
+
+2. **Variável de Ambiente (Opcional):**
+   ```
+   WEBHOOK_BASE_URL=https://seu-servidor-render.com
+   ```
+   Se não configurar, o webhook será usado apenas se `callback_url` for fornecido no `create-pix`.
 
 ## 📝 Logs
 
