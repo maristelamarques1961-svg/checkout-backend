@@ -24,10 +24,19 @@ app.post('/api/create-pix', async (req, res) => {
 		const { payer_name, amount, phone, callback_url } = req.body;
 
 		// Validações
-		if (!payer_name || !amount) {
+		if (!payer_name || !payer_name.trim()) {
 			return res.status(400).json({ 
 				success: false, 
-				message: 'Nome do pagador e valor são obrigatórios' 
+				message: 'Nome do pagador é obrigatório',
+				error: 'payer_name_required'
+			});
+		}
+		
+		if (!amount || isNaN(amount) || parseFloat(amount) <= 0) {
+			return res.status(400).json({ 
+				success: false, 
+				message: 'Valor inválido ou não informado',
+				error: 'invalid_amount'
 			});
 		}
 
