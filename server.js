@@ -107,15 +107,21 @@ app.post('/api/create-pix', async (req, res) => {
 			}
 		};
 
-		// Adicionar splits se Recipient ID estiver configurado
-		if (CONNECTPAY_RECIPIENT_ID) {
-			connectPayBody.splits = [
-				{
-					recipient_id: CONNECTPAY_RECIPIENT_ID,
-					percentage: 100 // 100% para o recipient (ajuste conforme necessário)
-				}
-			];
-		}
+		// ⚠️ SPLIT DE PAGAMENTO DESABILITADO POR SEGURANÇA ⚠️
+		// Se você precisar usar split, descomente o código abaixo e certifique-se de que
+		// o CONNECTPAY_RECIPIENT_ID pertence à SUA conta ConnectPay
+		// 
+		// ⚠️ ATENÇÃO: Se o recipient_id não for da sua conta, 100% do dinheiro será
+		// redirecionado para outra pessoa. SEMPRE verifique antes de ativar!
+		//
+		// if (CONNECTPAY_RECIPIENT_ID) {
+		// 	connectPayBody.splits = [
+		// 		{
+		// 			recipient_id: CONNECTPAY_RECIPIENT_ID,
+		// 			percentage: 100
+		// 		}
+		// 	];
+		// }
 
 		// Criar transação na ConnectPay
 		const connectPayResponse = await fetch(`${CONNECTPAY_BASE_URL}/v1/transactions`, {
